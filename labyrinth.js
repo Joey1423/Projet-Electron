@@ -263,7 +263,8 @@ ipcMain.handle('labyrinth:solve', async (_event, token, labyrinthId) => {
     [JSON.stringify(solution), id]
   );
 
-  return { solution };
+  const updated = await get('SELECT * FROM labyrinths WHERE id = ?', [id]);
+  return toEntity(updated);
 });
 
 module.exports = {

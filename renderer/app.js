@@ -1,4 +1,76 @@
 const statusEl = document.getElementById('status');
+
+// Modal functions to replace prompt() and confirm()
+let modalOverlay, modalMessage, modalInput, modalOkBtn, modalCancelBtn;
+
+function initializeModal() {
+  modalOverlay = document.getElementById('modal-overlay');
+  modalMessage = document.getElementById('modal-message');
+  modalInput = document.getElementById('modal-input');
+  modalOkBtn = document.getElementById('modal-ok');
+  modalCancelBtn = document.getElementById('modal-cancel');
+}
+
+function showModal(message, defaultValue = '', isPrompt = true) {
+  return new Promise((resolve) => {
+    modalMessage.textContent = message;
+    
+    if (isPrompt) {
+      modalInput.style.display = 'block';
+      modalInput.value = defaultValue || '';
+      modalInput.focus();
+    } else {
+      modalInput.style.display = 'none';
+    }
+    
+    modalOverlay.classList.remove('hidden');
+    
+    function onOk() {
+      cleanup();
+      resolve(isPrompt ? modalInput.value : true);
+    }
+    
+    function onCancel() {
+      cleanup();
+      resolve(isPrompt ? null : false);
+    }
+    
+    function cleanup() {
+      modalOkBtn.removeEventListener('click', onOk);
+      modalCancelBtn.removeEventListener('click', onCancel);
+      modalInput.removeEventListener('keypress', onKeypress);
+      modalOverlay.classList.add('hidden');
+    }
+    
+    function onKeypress(e) {
+      if (e.key === 'Enter') {
+        onOk();
+      } else if (e.key === 'Escape') {
+        onCancel();
+      }
+    }
+    
+    modalOkBtn.addEventListener('click', onOk);
+    modalCancelBtn.addEventListener('click', onCancel);
+    modalInput.addEventListener('keypress', onKeypress);
+  });
+}
+
+function customPrompt(message, defaultValue = '') {
+  return showModal(message, defaultValue, true);
+}
+
+function customConfirm(message) {
+  return showModal(message, '', false);
+}
+
+// Initialize modal elements
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeModal);
+} else {
+  initializeModal();
+}
+
 const whoamiEl = document.getElementById('whoami');
 const authSection = document.getElementById('auth-section');
 const authForm = document.getElementById('auth-form');
@@ -27,7 +99,7 @@ let token = '';
 let currentUser = null;
 let labyrinths = [];
 let selectedLabyrinthId = null;
-let showSolution = true;
+let showSolution = false;
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -132,6 +204,24 @@ function renderLabyrinths() {
     line.className = 'item-line';
     const info = document.createElement('strong');
     info.textContent = `${item.name} (${item.sizeLabel}, diff ${item.difficulty})`;
+    info.style.cursor = 'pointer';
+    info.addEventListener('click', async () => {
+      const newName = await customPrompt('Nouveau nom :', item.name);
+      if (!newName || newName.trim() === '') {
+        return;
+      }
+      try {
+        const updatedLabyrinth = await window.api.updateLabyrinth(token, { id: item.id, name: newName });
+        const index = labyrinths.findIndex(l => l.id === item.id);
+        if (index !== -1) {
+          labyrinths[index] = updatedLabyrinth;
+        }
+        renderLabyrinths();
+        setStatus('Labyrinthe renommé.');
+      } catch (error) {
+        setStatus(errorMessage(error));
+      }
+    });
 
     const selectBtn = makeButton('Voir', () => {
       selectedLabyrinthId = item.id;
@@ -146,13 +236,17 @@ function renderLabyrinths() {
 
     actions.appendChild(
       makeButton('Renommer', async () => {
-        const newName = window.prompt('Nouveau nom :', item.name);
+        const newName = await customPrompt('Nouveau nom :', item.name);
         if (!newName) {
           return;
         }
         try {
-          await window.api.updateLabyrinth(token, { id: item.id, name: newName });
-          await refreshLabyrinths(item.id);
+          const updatedLabyrinth = await window.api.updateLabyrinth(token, { id: item.id, name: newName });
+          const index = labyrinths.findIndex(l => l.id === item.id);
+          if (index !== -1) {
+            labyrinths[index] = updatedLabyrinth;
+          }
+          renderLabyrinths();
           setStatus('Labyrinthe renomme.');
         } catch (error) {
           setStatus(errorMessage(error));
@@ -162,8 +256,8 @@ function renderLabyrinths() {
 
     actions.appendChild(
       makeButton('Regenerer', async () => {
-        const sizeLabel = window.prompt('Taille (petite/moyenne/grande) :', item.sizeLabel) || item.sizeLabel;
-        const difficulty = Number(window.prompt('Difficulte (1-10) :', String(item.difficulty)) || item.difficulty);
+        const sizeLabel = await customPrompt('Taille (petite/moyenne/grande) :', item.sizeLabel) || item.sizeLabel;
+        const difficulty = Number(await customPrompt('Difficulte (1-10) :', String(item.difficulty)) || item.difficulty);
         try {
           await window.api.generateLabyrinth(token, { id: item.id, sizeLabel, difficulty });
           await refreshLabyrinths(item.id);
@@ -171,7 +265,7 @@ function renderLabyrinths() {
         } catch (error) {
           setStatus(errorMessage(error));
         }
-      })
+      }, 'primary')
     );
 
     actions.appendChild(
@@ -183,12 +277,12 @@ function renderLabyrinths() {
         } catch (error) {
           setStatus(errorMessage(error));
         }
-      })
+      }, 'primary')
     );
 
     actions.appendChild(
       makeButton('Supprimer', async () => {
-        const ok = window.confirm(`Supprimer ${item.name} ?`);
+        const ok = await customConfirm(`Supprimer ${item.name} ?`);
         if (!ok) {
           return;
         }
@@ -263,7 +357,7 @@ function renderAdmin(stats, users, labs) {
 
     actions.appendChild(
       makeButton('Supprimer', async () => {
-        if (!window.confirm(`Supprimer l'utilisateur ${user.username} ?`)) {
+        if (!await customConfirm(`Supprimer l'utilisateur ${user.username} ?`)) {
           return;
         }
         try {
@@ -292,7 +386,7 @@ function renderAdmin(stats, users, labs) {
     actions.className = 'actions';
     actions.appendChild(
       makeButton('Supprimer', async () => {
-        if (!window.confirm(`Supprimer le labyrinthe ${lab.name} ?`)) {
+        if (!await customConfirm(`Supprimer le labyrinthe ${lab.name} ?`)) {
           return;
         }
         try {

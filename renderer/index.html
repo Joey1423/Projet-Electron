@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'" />
     <title>Labyrinthe Desktop</title>
     <link rel="stylesheet" href="style.css" />
     <style>
@@ -123,7 +124,9 @@
           player: null,
           goal: null,
           step: 4,
-          radius: 6
+          radius: 5,
+          trail: [],
+          playerSize: 11
         };
 
         function syncOverlaySize() {
@@ -172,16 +175,22 @@
           octx.clearRect(0, 0, overlay.width, overlay.height);
           if (!state.player || !state.goal) return;
 
+          // Draw trail
+          state.trail.forEach((pos) => {
+            octx.fillStyle = 'rgba(100, 200, 255, 0.6)';
+            octx.fillRect(pos.x - state.playerSize, pos.y - state.playerSize, state.playerSize * 2, state.playerSize * 2);
+          });
+
+          // Draw goal
           octx.fillStyle = "#22c55e";
           octx.fillRect(state.goal.x - 7, state.goal.y - 7, 14, 14);
 
-          octx.beginPath();
-          octx.arc(state.player.x, state.player.y, state.radius, 0, Math.PI * 2);
+          // Draw player as a square
           octx.fillStyle = "#ef4444";
-          octx.fill();
+          octx.fillRect(state.player.x - state.playerSize, state.player.y - state.playerSize, state.playerSize * 2, state.playerSize * 2);
           octx.lineWidth = 2;
           octx.strokeStyle = "#fff";
-          octx.stroke();
+          octx.strokeRect(state.player.x - state.playerSize, state.player.y - state.playerSize, state.playerSize * 2, state.playerSize * 2);
         }
 
         function setHint(text) {
@@ -206,6 +215,7 @@
           state.player = start;
           state.goal = end;
           state.active = true;
+          state.trail = [];
           drawOverlay();
           setHint("Partie lancee. Deplacement: Fleches ou ZQSD.");
         }
@@ -215,6 +225,7 @@
           if (!start) return;
           state.player = start;
           state.active = true;
+          state.trail = [];
           drawOverlay();
           setHint("Joueur reinitialise.");
         }
@@ -225,6 +236,9 @@
           const nx = state.player.x + dx * state.step;
           const ny = state.player.y + dy * state.step;
           if (!isWalkableDisc(nx, ny, state.radius)) return;
+
+          // Add current position to trail
+          state.trail.push({ x: state.player.x, y: state.player.y });
 
           state.player.x = nx;
           state.player.y = ny;
@@ -259,5 +273,16 @@
         syncOverlaySize();
       })();
     </script>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div class="modal-box">
+        <p id="modal-message"></p>
+        <input id="modal-input" type="text" style="display:none; width: 100%; padding: 8px; margin: 10px 0; box-sizing: border-box;" />
+        <div class="modal-actions">
+          <button id="modal-cancel" type="button" class="secondary">Annuler</button>
+          <button id="modal-ok" type="button">OK</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
