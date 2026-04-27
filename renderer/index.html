@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Labyrinthe Desktop</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      .canvas-wrap {
+        position: relative;
+        width: 560px;
+        height: 560px;
+        max-width: 100%;
+      }
+
+      #maze-canvas,
+      #maze-overlay {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #maze-overlay {
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <h1>Labyrinthe Desktop</h1>
+        <div class="topbar-actions">
+          <span id="whoami" class="badge">Non connecte</span>
+          <button id="logout-btn" class="secondary hidden" type="button">Se deconnecter</button>
+        </div>
+      </header>
+
+      <p id="status" class="status">Initialisation...</p>
+
+      <section class="card" id="auth-section">
+        <h2>Authentification</h2>
+        <p class="hint">Compte admin par defaut: admin / admin123</p>
+        <form id="auth-form" class="grid two-cols">
+          <input id="username" type="text" placeholder="Nom utilisateur" required />
+          <input id="password" type="password" placeholder="Mot de passe (6+ caracteres)" required />
+          <div class="actions full-row">
+            <button type="button" id="register-btn" class="secondary">Inscription</button>
+            <button type="submit">Connexion</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card hidden" id="lab-section">
+        <h2>Mes labyrinthes</h2>
+        <form id="create-form" class="grid three-cols">
+          <input id="lab-name" type="text" placeholder="Nom du labyrinthe" required />
+          <select id="lab-size">
+            <option value="petite">petite</option>
+            <option value="moyenne" selected>moyenne</option>
+            <option value="grande">grande</option>
+          </select>
+          <input id="lab-difficulty" type="number" min="1" max="10" value="5" />
+          <button type="submit" class="full-row">Creer un labyrinthe</button>
+        </form>
+
+        <div class="content-grid">
+          <div>
+            <h3>Liste</h3>
+            <div id="lab-list" class="list"></div>
+          </div>
+          <div>
+            <h3>Apercu</h3>
+            <p id="selected-meta" class="hint">Selectionne un labyrinthe pour l'afficher.</p>
+
+            <div class="canvas-wrap">
+              <canvas id="maze-canvas" width="560" height="560"></canvas>
+              <canvas id="maze-overlay" width="560" height="560"></canvas>
+            </div>
+
+            <div class="actions">
+              <button id="toggle-solution" type="button" class="secondary">Afficher/masquer solution</button>
+              <button id="play-btn" type="button">Jouer</button>
+              <button id="reset-run-btn" type="button" class="secondary">Reinitialiser joueur</button>
+            </div>
+            <p id="game-hint" class="hint">Clique sur "Jouer", puis utilise Fleches ou ZQSD.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card hidden" id="admin-section">
+        <h2>Administration</h2>
+        <div class="actions">
+          <button id="load-admin" type="button">Actualiser</button>
+        </div>
+
+        <div id="admin-stats" class="stats-grid"></div>
+
+        <h3>Utilisateurs</h3>
+        <div id="admin-users" class="list"></div>
+
+        <h3>Labyrinthes globaux</h3>
+        <div id="admin-labs" class="list"></div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+      (() => {
+        const baseCanvas = document.getElementById("maze-canvas");
+        const overlay = document.getElementById("maze-overlay");
+        const playBtn = document.getElementById("play-btn");
+        const resetBtn = document.getElementById("reset-run-btn");
+        const hint = document.getElementById("game-hint");
+
+        if (!baseCanvas || !overlay || !playBtn || !resetBtn || !hint) return;
+
+        const bctx = baseCanvas.getContext("2d", { willReadFrequently: true });
+        const octx = overlay.getContext("2d");
+
+        const state = {
+          active: false,
+          player: null,
+          goal: null,
+          step: 4,
+          radius: 6
+        };
+
+        function syncOverlaySize() {
+          overlay.width = baseCanvas.width;
+          overlay.height = baseCanvas.height;
+        }
+
+        function luminance(r, g, b) {
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        }
+
+        function getPixel(x, y) {
+          const xx = Math.max(0, Math.min(baseCanvas.width - 1, Math.round(x)));
+          const yy = Math.max(0, Math.min(baseCanvas.height - 1, Math.round(y)));
+          const d = bctx.getImageData(xx, yy, 1, 1).data;
+          return { r: d[0], g: d[1], b: d[2], a: d[3] };
+        }
+
+        function isWalkable(x, y) {
+          const p = getPixel(x, y);
+          if (p.a === 0) return false;
+          return luminance(p.r, p.g, p.b) > 120;
+        }
+
+        function isWalkableDisc(x, y, r) {
+          const pts = [
+            [0, 0], [r, 0], [-r, 0], [0, r], [0, -r],
+            [r * 0.7, r * 0.7], [r * 0.7, -r * 0.7], [-r * 0.7, r * 0.7], [-r * 0.7, -r * 0.7]
+          ];
+          return pts.every(([dx, dy]) => isWalkable(x + dx, y + dy));
+        }
+
+        function findWalkableNear(startX, startY, maxRadius = 160) {
+          for (let rad = 0; rad <= maxRadius; rad += 2) {
+            for (let a = 0; a < 360; a += 6) {
+              const t = (a * Math.PI) / 180;
+              const x = startX + Math.cos(t) * rad;
+              const y = startY + Math.sin(t) * rad;
+              if (isWalkableDisc(x, y, state.radius)) return { x, y };
+            }
+          }
+          return null;
+        }
+
+        function drawOverlay() {
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+          if (!state.player || !state.goal) return;
+
+          octx.fillStyle = "#22c55e";
+          octx.fillRect(state.goal.x - 7, state.goal.y - 7, 14, 14);
+
+          octx.beginPath();
+          octx.arc(state.player.x, state.player.y, state.radius, 0, Math.PI * 2);
+          octx.fillStyle = "#ef4444";
+          octx.fill();
+          octx.lineWidth = 2;
+          octx.strokeStyle = "#fff";
+          octx.stroke();
+        }
+
+        function setHint(text) {
+          hint.textContent = text;
+        }
+
+        function initRun() {
+          syncOverlaySize();
+
+          const start = findWalkableNear(14, 14);
+          const end = findWalkableNear(baseCanvas.width - 14, baseCanvas.height - 14);
+
+          if (!start || !end) {
+            state.active = false;
+            state.player = null;
+            state.goal = null;
+            drawOverlay();
+            setHint("Impossible de trouver depart/arrivee. Clique d'abord sur Voir.");
+            return;
+          }
+
+          state.player = start;
+          state.goal = end;
+          state.active = true;
+          drawOverlay();
+          setHint("Partie lancee. Deplacement: Fleches ou ZQSD.");
+        }
+
+        function resetRun() {
+          const start = findWalkableNear(14, 14);
+          if (!start) return;
+          state.player = start;
+          state.active = true;
+          drawOverlay();
+          setHint("Joueur reinitialise.");
+        }
+
+        function tryMove(dx, dy) {
+          if (!state.active || !state.player || !state.goal) return;
+
+          const nx = state.player.x + dx * state.step;
+          const ny = state.player.y + dy * state.step;
+          if (!isWalkableDisc(nx, ny, state.radius)) return;
+
+          state.player.x = nx;
+          state.player.y = ny;
+          drawOverlay();
+
+          const dist = Math.hypot(state.player.x - state.goal.x, state.player.y - state.goal.y);
+          if (dist <= 10) {
+            state.active = false;
+            setHint("Bravo ! Labyrinthe termine.");
+            setTimeout(() => alert("Bravo ! Tu as termine le labyrinthe."), 50);
+          }
+        }
+
+        function onKeyDown(e) {
+          if (!state.active) return;
+          const k = e.key.toLowerCase();
+
+          if (["arrowup", "arrowdown", "arrowleft", "arrowright", "z", "q", "s", "d"].includes(k)) {
+            e.preventDefault();
+          }
+
+          if (k === "arrowup" || k === "z") tryMove(0, -1);
+          else if (k === "arrowdown" || k === "s") tryMove(0, 1);
+          else if (k === "arrowleft" || k === "q") tryMove(-1, 0);
+          else if (k === "arrowright" || k === "d") tryMove(1, 0);
+        }
+
+        playBtn.addEventListener("click", initRun);
+        resetBtn.addEventListener("click", resetRun);
+        window.addEventListener("keydown", onKeyDown);
+
+        syncOverlaySize();
+      })();
+    </script>
+  </body>
+</html>

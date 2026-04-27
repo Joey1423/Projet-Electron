@@ -1,0 +1,32 @@
+{
+  "name": "projet_labyrinthe_electron",
+  "version": "1.0.0",
+  "description": "Application desktop Electron de création et résolution de labyrinthes",
+  "main": "main.js",
+  "author": "Ynov",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "electron": "^30.0.9",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.ynov.labyrinthe",
+    "productName": "Labyrinthe Desktop",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/.cache/**/*"
+    ]
+  }
+}
