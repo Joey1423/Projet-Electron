@@ -189,30 +189,26 @@
 
           // Draw trail with glow
           octx.shadowBlur = 10;
-          octx.shadowColor = 'rgba(59, 130, 246, 0.4)';
+          octx.shadowColor = 'rgba(16, 185, 129, 0.4)';
           state.trail.forEach((pos) => {
-            octx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+            octx.fillStyle = 'rgba(16, 185, 129, 0.3)';
             octx.fillRect(pos.x - state.playerSize/2, pos.y - state.playerSize/2, state.playerSize, state.playerSize);
           });
 
-          // Draw goal
+          // Draw goal (red square)
           octx.shadowBlur = 20;
           octx.shadowColor = '#f43f5e';
           octx.fillStyle = "#f43f5e";
-          octx.beginPath();
-          octx.arc(state.goal.x, state.goal.y, 8, 0, Math.PI * 2);
-          octx.fill();
+          octx.fillRect(state.goal.x - state.playerSize/2, state.goal.y - state.playerSize/2, state.playerSize, state.playerSize);
 
-          // Draw player
-          octx.shadowColor = '#3b82f6';
-          octx.fillStyle = "#3b82f6";
-          octx.beginPath();
-          octx.arc(state.player.x, state.player.y, 6, 0, Math.PI * 2);
-          octx.fill();
+          // Draw player (green square)
+          octx.shadowColor = '#10b981';
+          octx.fillStyle = "#10b981";
+          octx.fillRect(state.player.x - state.playerSize/2, state.player.y - state.playerSize/2, state.playerSize, state.playerSize);
           
           octx.strokeStyle = "#fff";
           octx.lineWidth = 2;
-          octx.stroke();
+          octx.strokeRect(state.player.x - state.playerSize/2, state.player.y - state.playerSize/2, state.playerSize, state.playerSize);
           octx.shadowBlur = 0;
         }
 

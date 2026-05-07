@@ -539,3 +539,22 @@ adminBtn.addEventListener('click', async () => {
 
 applyLoginState();
 setStatus('Inscris-toi ou connecte-toi pour commencer.');
+
+// Handle Delete key for deleting selected labyrinth
+document.addEventListener('keydown', async (e) => {
+  if (e.key === 'Delete' && selectedLabyrinthId && token && currentUser && labSection.classList.contains('hidden') === false) {
+    const selected = getSelectedLabyrinth();
+    if (!selected) return;
+    
+    const ok = await customConfirm(`Supprimer ${selected.name} ?`);
+    if (!ok) return;
+    
+    try {
+      await window.api.deleteLabyrinth(token, selected.id);
+      await refreshLabyrinths();
+      setStatus('Labyrinthe supprime.');
+    } catch (error) {
+      setStatus(errorMessage(error));
+    }
+  }
+});
