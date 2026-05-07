@@ -134,22 +134,38 @@ function drawLabyrinth(labyrinth) {
 
   for (let y = 0; y < h; y += 1) {
     for (let x = 0; x < w; x += 1) {
-      ctx.fillStyle = grid[y][x] === 1 ? '#0b0f14' : '#f8fafc';
+      ctx.fillStyle = grid[y][x] === 1 ? '#334155' : '#020617'; // Walls vs Path
       ctx.fillRect(x * cell, y * cell, cell, cell);
+      
+      // Add subtle inner shadow to walls for depth
+      if (grid[y][x] === 1) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.fillRect(x * cell, y * cell, cell, 1);
+      }
     }
   }
 
   if (showSolution && Array.isArray(labyrinth.solution) && labyrinth.solution.length > 0) {
-    ctx.fillStyle = 'rgba(37, 99, 235, 0.65)';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#3b82f6';
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
     labyrinth.solution.forEach((step) => {
-      ctx.fillRect(step.x * cell, step.y * cell, cell, cell);
+      ctx.fillRect(step.x * cell + cell/4, step.y * cell + cell/4, cell/2, cell/2);
     });
+    ctx.shadowBlur = 0;
   }
 
-  ctx.fillStyle = '#22c55e';
-  ctx.fillRect(cell, cell, cell, cell);
-  ctx.fillStyle = '#ef4444';
-  ctx.fillRect((w - 2) * cell, (h - 2) * cell, cell, cell);
+  // Start (Emerald)
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = '#10b981';
+  ctx.fillStyle = '#10b981';
+  ctx.fillRect(cell + 2, cell + 2, cell - 4, cell - 4);
+  
+  // End (Rose/Red)
+  ctx.shadowColor = '#f43f5e';
+  ctx.fillStyle = '#f43f5e';
+  ctx.fillRect((w - 2) * cell + 2, (h - 2) * cell + 2, cell - 4, cell - 4);
+  ctx.shadowBlur = 0;
 }
 
 function getSelectedLabyrinth() {
@@ -168,10 +184,10 @@ function renderSelected() {
   drawLabyrinth(selected);
 }
 
-function makeButton(label, onClick, className = '') {
+function makeButton(htmlLabel, onClick, className = '') {
   const button = document.createElement('button');
   button.type = 'button';
-  button.textContent = label;
+  button.innerHTML = htmlLabel;
   if (className) {
     button.className = className;
   }
@@ -223,7 +239,7 @@ function renderLabyrinths() {
       }
     });
 
-    const selectBtn = makeButton('Voir', () => {
+    const selectBtn = makeButton('<i class="fas fa-eye"></i> Voir', () => {
       selectedLabyrinthId = item.id;
       renderSelected();
     }, 'secondary');
@@ -235,7 +251,7 @@ function renderLabyrinths() {
     actions.className = 'actions';
 
     actions.appendChild(
-      makeButton('Renommer', async () => {
+      makeButton('<i class="fas fa-edit"></i> Renommer', async () => {
         const newName = await customPrompt('Nouveau nom :', item.name);
         if (!newName) {
           return;
@@ -255,7 +271,7 @@ function renderLabyrinths() {
     );
 
     actions.appendChild(
-      makeButton('Regenerer', async () => {
+      makeButton('<i class="fas fa-sync-alt"></i> Régénérer', async () => {
         const sizeLabel = await customPrompt('Taille (petite/moyenne/grande) :', item.sizeLabel) || item.sizeLabel;
         const difficulty = Number(await customPrompt('Difficulte (1-10) :', String(item.difficulty)) || item.difficulty);
         try {
@@ -269,7 +285,7 @@ function renderLabyrinths() {
     );
 
     actions.appendChild(
-      makeButton('Resoudre', async () => {
+      makeButton('<i class="fas fa-check"></i> Résoudre', async () => {
         try {
           await window.api.solveLabyrinth(token, item.id);
           await refreshLabyrinths(item.id);
@@ -281,7 +297,7 @@ function renderLabyrinths() {
     );
 
     actions.appendChild(
-      makeButton('Supprimer', async () => {
+      makeButton('<i class="fas fa-trash"></i> Supprimer', async () => {
         const ok = await customConfirm(`Supprimer ${item.name} ?`);
         if (!ok) {
           return;
@@ -341,7 +357,7 @@ function renderAdmin(stats, users, labs) {
     actions.className = 'actions';
 
     actions.appendChild(
-      makeButton(user.role === 'admin' ? 'Passer user' : 'Passer admin', async () => {
+      makeButton(user.role === 'admin' ? '<i class="fas fa-user"></i> Passer user' : '<i class="fas fa-user-shield"></i> Passer admin', async () => {
         try {
           await window.api.adminUpdateUser(token, {
             id: user.id,
@@ -356,7 +372,7 @@ function renderAdmin(stats, users, labs) {
     );
 
     actions.appendChild(
-      makeButton('Supprimer', async () => {
+      makeButton('<i class="fas fa-user-slash"></i> Supprimer', async () => {
         if (!await customConfirm(`Supprimer l'utilisateur ${user.username} ?`)) {
           return;
         }
@@ -385,7 +401,7 @@ function renderAdmin(stats, users, labs) {
     const actions = document.createElement('div');
     actions.className = 'actions';
     actions.appendChild(
-      makeButton('Supprimer', async () => {
+      makeButton('<i class="fas fa-trash-alt"></i> Supprimer', async () => {
         if (!await customConfirm(`Supprimer le labyrinthe ${lab.name} ?`)) {
           return;
         }

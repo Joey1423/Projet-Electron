@@ -4,8 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'" />
-    <title>Labyrinthe Desktop</title>
+    <title>Labyrinthe Pro | Premium Maze Engine</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <style>
       .canvas-wrap {
         position: relative;
@@ -30,10 +31,15 @@
   <body>
     <main class="app">
       <header class="topbar">
-        <h1>Labyrinthe Desktop</h1>
+        <div class="logo">
+          <i class="fas fa-microchip" style="color: var(--accent); font-size: 2rem;"></i>
+          <h1>Labyrinthe<span>Pro</span></h1>
+        </div>
         <div class="topbar-actions">
-          <span id="whoami" class="badge">Non connecte</span>
-          <button id="logout-btn" class="secondary hidden" type="button">Se deconnecter</button>
+          <span id="whoami" class="badge"><i class="fas fa-user-circle"></i> Non connecté</span>
+          <button id="logout-btn" class="secondary hidden" type="button">
+            <i class="fas fa-sign-out-alt"></i> Déconnexion
+          </button>
         </div>
       </header>
 
@@ -43,11 +49,17 @@
         <h2>Authentification</h2>
         <p class="hint">Compte admin par defaut: admin / admin123</p>
         <form id="auth-form" class="grid two-cols">
-          <input id="username" type="text" placeholder="Nom utilisateur" required />
-          <input id="password" type="password" placeholder="Mot de passe (6+ caracteres)" required />
+          <div class="input-group">
+            <i class="fas fa-user"></i>
+            <input id="username" type="text" placeholder="Nom utilisateur" required />
+          </div>
+          <div class="input-group">
+            <i class="fas fa-lock"></i>
+            <input id="password" type="password" placeholder="Mot de passe (6+ caractères)" required />
+          </div>
           <div class="actions full-row">
-            <button type="button" id="register-btn" class="secondary">Inscription</button>
-            <button type="submit">Connexion</button>
+            <button type="button" id="register-btn" class="secondary"><i class="fas fa-user-plus"></i> Inscription</button>
+            <button type="submit"><i class="fas fa-sign-in-alt"></i> Connexion</button>
           </div>
         </form>
       </section>
@@ -57,12 +69,12 @@
         <form id="create-form" class="grid three-cols">
           <input id="lab-name" type="text" placeholder="Nom du labyrinthe" required />
           <select id="lab-size">
-            <option value="petite">petite</option>
-            <option value="moyenne" selected>moyenne</option>
-            <option value="grande">grande</option>
+            <option value="petite">Petite taille</option>
+            <option value="moyenne" selected>Taille moyenne</option>
+            <option value="grande">Grande taille</option>
           </select>
-          <input id="lab-difficulty" type="number" min="1" max="10" value="5" />
-          <button type="submit" class="full-row">Creer un labyrinthe</button>
+          <input id="lab-difficulty" type="number" min="1" max="10" value="5" title="Difficulté (1-10)" />
+          <button type="submit" class="full-row"><i class="fas fa-magic"></i> Créer un nouveau labyrinthe</button>
         </form>
 
         <div class="content-grid">
@@ -80,11 +92,11 @@
             </div>
 
             <div class="actions">
-              <button id="toggle-solution" type="button" class="secondary">Afficher/masquer solution</button>
-              <button id="play-btn" type="button">Jouer</button>
-              <button id="reset-run-btn" type="button" class="secondary">Reinitialiser joueur</button>
+              <button id="toggle-solution" type="button" class="secondary"><i class="fas fa-eye"></i> Solution</button>
+              <button id="play-btn" type="button"><i class="fas fa-play"></i> Jouer</button>
+              <button id="reset-run-btn" type="button" class="secondary"><i class="fas fa-undo"></i> Reset</button>
             </div>
-            <p id="game-hint" class="hint">Clique sur "Jouer", puis utilise Fleches ou ZQSD.</p>
+            <p id="game-hint" class="hint"><i class="fas fa-keyboard"></i> Utilisez les flèches ou ZQSD pour vous déplacer.</p>
           </div>
         </div>
       </section>
@@ -148,7 +160,7 @@
         function isWalkable(x, y) {
           const p = getPixel(x, y);
           if (p.a === 0) return false;
-          return luminance(p.r, p.g, p.b) > 120;
+          return luminance(p.r, p.g, p.b) < 30; // Path is #020617 (lum ~6), Walls are #334155 (lum ~62)
         }
 
         function isWalkableDisc(x, y, r) {
@@ -175,22 +187,33 @@
           octx.clearRect(0, 0, overlay.width, overlay.height);
           if (!state.player || !state.goal) return;
 
-          // Draw trail
+          // Draw trail with glow
+          octx.shadowBlur = 10;
+          octx.shadowColor = 'rgba(59, 130, 246, 0.4)';
           state.trail.forEach((pos) => {
-            octx.fillStyle = 'rgba(100, 200, 255, 0.6)';
-            octx.fillRect(pos.x - state.playerSize, pos.y - state.playerSize, state.playerSize * 2, state.playerSize * 2);
+            octx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+            octx.fillRect(pos.x - state.playerSize/2, pos.y - state.playerSize/2, state.playerSize, state.playerSize);
           });
 
           // Draw goal
-          octx.fillStyle = "#22c55e";
-          octx.fillRect(state.goal.x - 7, state.goal.y - 7, 14, 14);
+          octx.shadowBlur = 20;
+          octx.shadowColor = '#f43f5e';
+          octx.fillStyle = "#f43f5e";
+          octx.beginPath();
+          octx.arc(state.goal.x, state.goal.y, 8, 0, Math.PI * 2);
+          octx.fill();
 
-          // Draw player as a square
-          octx.fillStyle = "#ef4444";
-          octx.fillRect(state.player.x - state.playerSize, state.player.y - state.playerSize, state.playerSize * 2, state.playerSize * 2);
-          octx.lineWidth = 2;
+          // Draw player
+          octx.shadowColor = '#3b82f6';
+          octx.fillStyle = "#3b82f6";
+          octx.beginPath();
+          octx.arc(state.player.x, state.player.y, 6, 0, Math.PI * 2);
+          octx.fill();
+          
           octx.strokeStyle = "#fff";
-          octx.strokeRect(state.player.x - state.playerSize, state.player.y - state.playerSize, state.playerSize * 2, state.playerSize * 2);
+          octx.lineWidth = 2;
+          octx.stroke();
+          octx.shadowBlur = 0;
         }
 
         function setHint(text) {
