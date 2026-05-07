@@ -200,7 +200,8 @@ function renderLabyrinths() {
 
   if (labyrinths.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'list-item';
+    empty.className = 'lab-item';
+    empty.style.cursor = 'default';
     empty.textContent = 'Aucun labyrinthe pour le moment.';
     labListEl.appendChild(empty);
     selectedLabyrinthId = null;
@@ -214,105 +215,65 @@ function renderLabyrinths() {
 
   labyrinths.forEach((item) => {
     const wrapper = document.createElement('div');
-    wrapper.className = 'list-item';
+    wrapper.className = `lab-item ${item.id === selectedLabyrinthId ? 'selected' : ''}`;
+    
+    const h4 = document.createElement('h4');
+    h4.textContent = item.name;
+    
+    const p = document.createElement('p');
+    p.textContent = `${item.sizeLabel} • Diff ${item.difficulty} • ${item.width}x${item.height}`;
 
-    const line = document.createElement('div');
-    line.className = 'item-line';
-    const info = document.createElement('strong');
-    info.textContent = `${item.name} (${item.sizeLabel}, diff ${item.difficulty})`;
-    info.style.cursor = 'pointer';
-    info.addEventListener('click', async () => {
-      const newName = await customPrompt('Nouveau nom :', item.name);
-      if (!newName || newName.trim() === '') {
-        return;
-      }
-      try {
-        const updatedLabyrinth = await window.api.updateLabyrinth(token, { id: item.id, name: newName });
-        const index = labyrinths.findIndex(l => l.id === item.id);
-        if (index !== -1) {
-          labyrinths[index] = updatedLabyrinth;
-        }
-        renderLabyrinths();
-        setStatus('Labyrinthe renommé.');
-      } catch (error) {
-        setStatus(errorMessage(error));
-      }
-    });
+    wrapper.appendChild(h4);
+    wrapper.appendChild(p);
 
-    const selectBtn = makeButton('<i class="fas fa-eye"></i> Voir', () => {
+    wrapper.addEventListener('click', () => {
       selectedLabyrinthId = item.id;
-      renderSelected();
-    }, 'secondary');
-
-    line.appendChild(info);
-    line.appendChild(selectBtn);
+      renderLabyrinths(); // Refresh to update 'selected' class
+    });
 
     const actions = document.createElement('div');
     actions.className = 'actions';
+    actions.style.marginTop = '12px';
 
     actions.appendChild(
-      makeButton('<i class="fas fa-edit"></i> Renommer', async () => {
+      makeButton('<i class="fas fa-edit"></i>', async (e) => {
+        e.stopPropagation();
         const newName = await customPrompt('Nouveau nom :', item.name);
-        if (!newName) {
-          return;
-        }
+        if (!newName || newName.trim() === '') return;
         try {
-          const updatedLabyrinth = await window.api.updateLabyrinth(token, { id: item.id, name: newName });
-          const index = labyrinths.findIndex(l => l.id === item.id);
-          if (index !== -1) {
-            labyrinths[index] = updatedLabyrinth;
-          }
+          const updated = await window.api.updateLabyrinth(token, { id: item.id, name: newName });
+          const idx = labyrinths.findIndex(l => l.id === item.id);
+          if (idx !== -1) labyrinths[idx] = updated;
           renderLabyrinths();
-          setStatus('Labyrinthe renomme.');
-        } catch (error) {
-          setStatus(errorMessage(error));
-        }
+          setStatus('Labyrinthe renommé.');
+        } catch (error) { setStatus(errorMessage(error)); }
       }, 'secondary')
     );
 
     actions.appendChild(
-      makeButton('<i class="fas fa-sync-alt"></i> Régénérer', async () => {
-        const sizeLabel = await customPrompt('Taille (petite/moyenne/grande) :', item.sizeLabel) || item.sizeLabel;
-        const difficulty = Number(await customPrompt('Difficulte (1-10) :', String(item.difficulty)) || item.difficulty);
+      makeButton('<i class="fas fa-sync-alt"></i>', async (e) => {
+        e.stopPropagation();
         try {
-          await window.api.generateLabyrinth(token, { id: item.id, sizeLabel, difficulty });
+          await window.api.generateLabyrinth(token, { id: item.id, sizeLabel: item.sizeLabel, difficulty: item.difficulty });
           await refreshLabyrinths(item.id);
-          setStatus('Labyrinthe regenere.');
-        } catch (error) {
-          setStatus(errorMessage(error));
-        }
-      }, 'primary')
+          setStatus('Labyrinthe régénéré.');
+        } catch (error) { setStatus(errorMessage(error)); }
+      }, 'secondary')
     );
 
     actions.appendChild(
-      makeButton('<i class="fas fa-check"></i> Résoudre', async () => {
-        try {
-          await window.api.solveLabyrinth(token, item.id);
-          await refreshLabyrinths(item.id);
-          setStatus('Solution recalculee.');
-        } catch (error) {
-          setStatus(errorMessage(error));
-        }
-      }, 'primary')
-    );
-
-    actions.appendChild(
-      makeButton('<i class="fas fa-trash"></i> Supprimer', async () => {
+      makeButton('<i class="fas fa-trash"></i>', async (e) => {
+        e.stopPropagation();
         const ok = await customConfirm(`Supprimer ${item.name} ?`);
-        if (!ok) {
-          return;
-        }
+        if (!ok) return;
         try {
           await window.api.deleteLabyrinth(token, item.id);
           await refreshLabyrinths();
-          setStatus('Labyrinthe supprime.');
-        } catch (error) {
-          setStatus(errorMessage(error));
-        }
-      }, 'secondary')
+          setStatus('Labyrinthe supprimé.');
+        } catch (error) { setStatus(errorMessage(error)); }
+      }, 'secondary danger')
     );
 
-    wrapper.appendChild(line);
     wrapper.appendChild(actions);
     labListEl.appendChild(wrapper);
   });
@@ -333,16 +294,16 @@ function renderAdmin(stats, users, labs) {
   adminUsersEl.innerHTML = '';
   adminLabsEl.innerHTML = '';
 
-  const boxes = [
-    `Utilisateurs: ${stats.totalUsers}`,
-    `Labyrinthes: ${stats.totalLabyrinths}`,
-    `Top createur: ${stats.byUser[0]?.username || '-'}`,
+  const labels = [
+    { label: 'Utilisateurs', value: stats.totalUsers },
+    { label: 'Labyrinthes', value: stats.totalLabyrinths },
+    { label: 'Top Créateur', value: stats.byUser[0]?.username || '-' },
   ];
-  boxes.forEach((label) => {
-    const box = document.createElement('div');
-    box.className = 'stat-box';
-    box.textContent = label;
-    adminStatsEl.appendChild(box);
+  labels.forEach((item) => {
+    const card = document.createElement('div');
+    card.className = 'stat-card';
+    card.innerHTML = `<span class="value">${item.value}</span><span class="label">${item.label}</span>`;
+    adminStatsEl.appendChild(card);
   });
 
   users.forEach((user) => {
@@ -436,19 +397,28 @@ async function loadAdminData() {
 function applyLoginState() {
   const loggedIn = Boolean(token && currentUser);
   authSection.classList.toggle('hidden', loggedIn);
-  labSection.classList.toggle('hidden', !loggedIn);
-  logoutBtn.classList.toggle('hidden', !loggedIn);
-
+  
+  // Sidebar elements
+  document.getElementById('user-display').classList.toggle('hidden', !loggedIn);
+  document.getElementById('logout-btn').classList.toggle('hidden', !loggedIn);
+  document.getElementById('nav-admin').classList.toggle('hidden', !loggedIn || currentUser.role !== 'admin');
+  
   if (!loggedIn) {
-    whoamiEl.textContent = 'Non connecte';
+    labSection.classList.add('hidden');
     adminSection.classList.add('hidden');
     clearCanvas();
-    selectedMetaEl.textContent = 'Selectionne un labyrinthe pour l\'afficher.';
+    selectedMetaEl.textContent = 'Sélectionne un labyrinthe.';
     return;
   }
 
-  whoamiEl.textContent = `${currentUser.username} (${currentUser.role})`;
-  adminSection.classList.toggle('hidden', currentUser.role !== 'admin');
+  whoamiEl.textContent = currentUser.username;
+  document.getElementById('user-role-label').textContent = currentUser.role;
+  document.getElementById('avatar-char').textContent = currentUser.username.charAt(0).toUpperCase();
+  
+  // Show maze section by default if not already in admin
+  if (adminSection.classList.contains('hidden')) {
+    window.showView('lab-section');
+  }
 }
 
 async function postLogin(authResult) {
